@@ -1,0 +1,36 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  --ui-bg: #0f0f0f;
+  --ui-surface: #1a1a1a;
+  --ui-surface-hover: #2a2a2a;
+  --ui-border: #333333;
+  --ui-border-strong: #555555;
+  --ui-text: #ffffff;
+  --ui-text-muted: #9ca3af;
+  --ui-text-soft: #d1d5db;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100dvh;
+  background-color: var(--ui-bg);
+  color: var(--ui-text);
+}
+
+#root {
+  width: 100%;
+  height: 100dvh;
+}
