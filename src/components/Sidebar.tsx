@@ -3,6 +3,7 @@ import {
     Menu,
     PanelLeftClose,
     PanelLeftOpen,
+    Search,
     Settings,
     X,
 } from 'lucide-react';
@@ -15,6 +16,7 @@ interface SidebarProps {
 
 const navItems = [
     { id: 'dashboard', icon: Home, label: 'Apps' },
+    { id: 'discover', icon: Search, label: 'Discover' },
     { id: 'settings', icon: Settings, label: 'Settings' },
 ] as const;
 
