@@ -6,6 +6,7 @@ use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use tauri::{
+    image::Image,
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     AppHandle, Manager, WindowEvent,
@@ -20,6 +21,7 @@ const CONFIG_DIR_RELATIVE: &str = ".hymetalab/config";
 const APPS_FILE_NAME: &str = "apps.json";
 const TRAY_MENU_ID_OPEN_LAUNCHER: &str = "open_launcher";
 const TRAY_MENU_ID_QUIT: &str = "quit_launcher";
+const TRAY_ICON_BYTES: &[u8] = include_bytes!("../icon-source.png");
 
 #[tauri::command]
 fn launch_app(app_name: String) -> Result<(), String> {
@@ -418,13 +420,11 @@ fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
     let quit_item = MenuItem::with_id(app, TRAY_MENU_ID_QUIT, "Quit", true, None::<&str>)?;
     let tray_menu = Menu::with_items(app, &[&open_launcher_item, &quit_item])?;
 
-    let tray_icon = app
-        .default_window_icon()
-        .cloned()
-        .expect("default window icon should be available");
+    let tray_icon = Image::from_bytes(TRAY_ICON_BYTES)?;
 
     TrayIconBuilder::with_id("launcher-tray")
         .icon(tray_icon)
+        .icon_as_template(false)
         .menu(&tray_menu)
         .tooltip("HYMetaLab Launcher")
         .show_menu_on_left_click(false)

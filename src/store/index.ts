@@ -22,7 +22,7 @@ const errorMessage = (error: unknown): string => {
 };
 
 interface AppState {
-    currentPage: 'dashboard' | 'discover' | 'settings';
+    currentPage: 'dashboard' | 'discover';
     config: AppConfig;
     isLoading: boolean;
     isAppsLoading: boolean;

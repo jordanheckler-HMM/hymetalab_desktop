@@ -3,7 +3,6 @@ import { Menu } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import DiscoverAppsView from './components/DiscoverAppsView';
-import SettingsView from './components/SettingsView';
 import { useStore } from './store';
 
 function App() {
@@ -42,8 +41,6 @@ function App() {
         return <Dashboard />;
       case 'discover':
         return <DiscoverAppsView />;
-      case 'settings':
-        return <SettingsView />;
       default:
         return <Dashboard />;
     }
