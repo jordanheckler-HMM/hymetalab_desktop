@@ -1,8 +1,9 @@
+use base64::Engine;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::env;
 use std::fs::{self, File};
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, Cursor};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use tauri::{
@@ -391,6 +392,83 @@ fn get_running_registered_apps(paths: Vec<String>) -> Vec<RunningRegisteredApp> 
         .collect()
 }
 
+#[tauri::command]
+fn get_app_icon(path: String) -> Result<String, String> {
+    let app_path = Path::new(&path);
+    if !app_path.exists() {
+        return Err(format!("App does not exist at: {path}"));
+    }
+
+    let resources_dir = app_path.join("Contents/Resources");
+    if !resources_dir.exists() {
+        return Err("No Contents/Resources directory found.".to_string());
+    }
+
+    // Find first .icns file in resources
+    let icns_path = fs::read_dir(&resources_dir)
+        .map_err(|e| format!("Failed to read Resources dir: {e}"))?  
+        .filter_map(|entry| entry.ok())
+        .map(|entry| entry.path())
+        .find(|p| {
+            p.extension()
+                .and_then(|ext| ext.to_str())
+                .map(|ext| ext.eq_ignore_ascii_case("icns"))
+                .unwrap_or(false)
+        })
+        .ok_or_else(|| "No .icns file found in app bundle.".to_string())?;
+
+    let icns_file = File::open(&icns_path)
+        .map_err(|e| format!("Failed to open icns file: {e}"))?;
+
+    let icon_family = icns::IconFamily::read(icns_file)
+        .map_err(|e| format!("Failed to parse icns file: {e}"))?;
+
+    // Try icon types from largest to smallest
+    let preferred_types = [
+        icns::IconType::RGBA32_512x512_2x,
+        icns::IconType::RGBA32_512x512,
+        icns::IconType::RGBA32_256x256_2x,
+        icns::IconType::RGBA32_256x256,
+        icns::IconType::RGBA32_128x128_2x,
+        icns::IconType::RGBA32_128x128,
+        icns::IconType::RGBA32_64x64,
+
+        icns::IconType::RGBA32_32x32,
+        icns::IconType::RGBA32_16x16,
+    ];
+
+    let available_types = icon_family.available_icons();
+
+    let icon_type = preferred_types
+        .iter()
+        .find(|t| available_types.contains(t))
+        .or_else(|| available_types.first())
+        .ok_or_else(|| "No usable icon elements found.".to_string())?;
+
+    let icon_image = icon_family
+        .get_icon_with_type(*icon_type)
+        .map_err(|e| format!("Failed to decode icon element: {e}"))?;
+
+    let width = icon_image.width();
+    let height = icon_image.height();
+    let raw_data = icon_image.data();
+
+    let img_buf: image::ImageBuffer<image::Rgba<u8>, _> =
+        image::ImageBuffer::from_raw(width, height, raw_data.to_vec())
+            .ok_or_else(|| "Failed to create image buffer.".to_string())?;
+
+    // Resize to 64x64 for consistent UI
+    let resized = image::imageops::resize(&img_buf, 64, 64, image::imageops::FilterType::Lanczos3);
+
+    let mut png_bytes: Vec<u8> = Vec::new();
+    resized
+        .write_to(&mut Cursor::new(&mut png_bytes), image::ImageFormat::Png)
+        .map_err(|e| format!("Failed to encode as PNG: {e}"))?;
+
+    let b64 = base64::engine::general_purpose::STANDARD.encode(&png_bytes);
+    Ok(format!("data:image/png;base64,{b64}"))
+}
+
 fn show_main_window(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.show();
@@ -532,7 +610,8 @@ pub fn run() {
             remove_registered_app,
             scan_installed_apps,
             launch_registered_app,
-            get_running_registered_apps
+            get_running_registered_apps,
+            get_app_icon
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

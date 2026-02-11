@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import {
     addRegisteredApp as addRegisteredAppApi,
     AppConfig,
+    getAppIcon,
     getRegisteredApps,
     getRunningRegisteredApps,
     launchRegisteredApp,
@@ -13,6 +14,43 @@ import {
 } from '../utils/tauri';
 
 export type RunningAppsMap = Record<string, boolean>;
+export type IconCacheMap = Record<string, string>;
+
+export interface VisualSettings {
+    glassmorphism: boolean;
+    dynamicBackground: boolean;
+    microAnimations: boolean;
+    appIcons: boolean;
+}
+
+const DEFAULT_VISUAL_SETTINGS: VisualSettings = {
+    glassmorphism: true,
+    dynamicBackground: true,
+    microAnimations: true,
+    appIcons: true,
+};
+
+const VISUAL_SETTINGS_KEY = 'hymetalab_visual_settings';
+
+function loadVisualSettings(): VisualSettings {
+    try {
+        const raw = localStorage.getItem(VISUAL_SETTINGS_KEY);
+        if (raw) {
+            return { ...DEFAULT_VISUAL_SETTINGS, ...JSON.parse(raw) };
+        }
+    } catch {
+        // ignore
+    }
+    return DEFAULT_VISUAL_SETTINGS;
+}
+
+function persistVisualSettings(settings: VisualSettings) {
+    try {
+        localStorage.setItem(VISUAL_SETTINGS_KEY, JSON.stringify(settings));
+    } catch {
+        // ignore
+    }
+}
 
 const errorMessage = (error: unknown): string => {
     if (error instanceof Error && error.message) {
@@ -22,15 +60,17 @@ const errorMessage = (error: unknown): string => {
 };
 
 interface AppState {
-    currentPage: 'dashboard' | 'discover';
+    currentPage: 'dashboard' | 'discover' | 'settings';
     config: AppConfig;
     isLoading: boolean;
     isAppsLoading: boolean;
     appsError: string | null;
     registeredApps: RegisteredApp[];
     runningApps: RunningAppsMap;
+    iconCache: IconCacheMap;
     sidebarCollapsed: boolean;
     mobileNavOpen: boolean;
+    visualSettings: VisualSettings;
     setPage: (page: AppState['currentPage']) => void;
     toggleSidebar: () => void;
     setMobileNavOpen: (isOpen: boolean) => void;
@@ -42,6 +82,9 @@ interface AppState {
     removeRegisteredApp: (path: string) => Promise<void>;
     scanInstalledApps: () => Promise<RegisteredApp[]>;
     launchExternalApp: (path: string) => Promise<void>;
+    fetchAppIcon: (path: string) => Promise<void>;
+    fetchAllIcons: (apps: RegisteredApp[]) => Promise<void>;
+    updateVisualSettings: (settings: Partial<VisualSettings>) => void;
 }
 
 export const useStore = create<AppState>((set, get) => ({
@@ -56,8 +99,10 @@ export const useStore = create<AppState>((set, get) => ({
     appsError: null,
     registeredApps: [],
     runningApps: {},
+    iconCache: {},
     sidebarCollapsed: true,
     mobileNavOpen: false,
+    visualSettings: loadVisualSettings(),
     setPage: (page) =>
         set({
             currentPage: page,
@@ -90,6 +135,9 @@ export const useStore = create<AppState>((set, get) => ({
             const registeredApps = await getRegisteredApps();
             set({ registeredApps });
             await get().refreshRunningApps();
+            if (get().visualSettings.appIcons) {
+                void get().fetchAllIcons(registeredApps);
+            }
         } catch (error) {
             set({ appsError: errorMessage(error) });
         } finally {
@@ -119,6 +167,9 @@ export const useStore = create<AppState>((set, get) => ({
         const registeredApps = await addRegisteredAppApi(path, name);
         set({ registeredApps, appsError: null });
         await get().refreshRunningApps();
+        if (get().visualSettings.appIcons) {
+            void get().fetchAppIcon(path);
+        }
     },
     removeRegisteredApp: async (path) => {
         const registeredApps = await removeRegisteredAppApi(path);
@@ -136,5 +187,26 @@ export const useStore = create<AppState>((set, get) => ({
                 [path]: true,
             },
         }));
-    }
+    },
+    fetchAppIcon: async (path) => {
+        if (get().iconCache[path]) return;
+        try {
+            const dataUrl = await getAppIcon(path);
+            set((state) => ({
+                iconCache: { ...state.iconCache, [path]: dataUrl },
+            }));
+        } catch {
+            // Silently fail — fallback icon will show
+        }
+    },
+    fetchAllIcons: async (apps) => {
+        const cache = get().iconCache;
+        const uncached = apps.filter((app) => !cache[app.path]);
+        await Promise.allSettled(uncached.map((app) => get().fetchAppIcon(app.path)));
+    },
+    updateVisualSettings: (partial) => {
+        const updated = { ...get().visualSettings, ...partial };
+        set({ visualSettings: updated });
+        persistVisualSettings(updated);
+    },
 }));

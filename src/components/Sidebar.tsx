@@ -1,11 +1,12 @@
 import {
     Home,
-    Menu,
     PanelLeftClose,
     PanelLeftOpen,
     Search,
+    Settings,
     X,
 } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { useStore } from '../store';
 import { cn } from '../utils/cn';
 
@@ -16,25 +17,33 @@ interface SidebarProps {
 const navItems = [
     { id: 'dashboard', icon: Home, label: 'Apps' },
     { id: 'discover', icon: Search, label: 'Discover' },
+    { id: 'settings', icon: Settings, label: 'Settings' },
 ] as const;
 
 const Sidebar = ({ mobile = false }: SidebarProps) => {
     const currentPage = useStore((state) => state.currentPage);
     const registeredApps = useStore((state) => state.registeredApps);
     const sidebarCollapsed = useStore((state) => state.sidebarCollapsed);
+    const glassmorphism = useStore((state) => state.visualSettings.glassmorphism);
+    const microAnimations = useStore((state) => state.visualSettings.microAnimations);
     const setPage = useStore((state) => state.setPage);
     const toggleSidebar = useStore((state) => state.toggleSidebar);
     const setMobileNavOpen = useStore((state) => state.setMobileNavOpen);
 
     const isCollapsed = mobile ? false : sidebarCollapsed;
-
     const widthClassName = mobile ? 'w-64' : isCollapsed ? 'w-16' : 'w-56';
+
+    const sidebarBg = glassmorphism
+        ? 'glass'
+        : 'bg-[var(--ui-surface-solid)] border-r border-[var(--ui-border)]';
 
     return (
         <aside
             className={cn(
-                'flex h-dvh shrink-0 flex-col border-r border-[var(--ui-border)] bg-[var(--ui-surface)] py-3 transition-[width] duration-200',
-                widthClassName
+                'flex h-dvh shrink-0 flex-col py-3 transition-[width] duration-200',
+                widthClassName,
+                sidebarBg,
+                !glassmorphism && 'border-r border-[var(--ui-border)]'
             )}
         >
             <div className={cn('mb-3 flex items-center px-2', isCollapsed ? 'justify-center' : 'justify-between')}>
@@ -73,9 +82,13 @@ const Sidebar = ({ mobile = false }: SidebarProps) => {
                 <ul className="space-y-1">
                     {navItems.map((item) => {
                         const isActive = currentPage === item.id;
+                        const Wrapper = microAnimations ? motion.li : 'li';
+                        const wrapperProps = microAnimations
+                            ? { whileHover: { scale: 1.02 }, whileTap: { scale: 0.97 } }
+                            : {};
 
                         return (
-                            <li key={item.id}>
+                            <Wrapper key={item.id} {...wrapperProps}>
                                 <button
                                     type="button"
                                     onClick={() => setPage(item.id)}
@@ -86,7 +99,7 @@ const Sidebar = ({ mobile = false }: SidebarProps) => {
                                         'group relative flex w-full items-center rounded-lg py-2 text-sm transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--ui-surface)]',
                                         isCollapsed ? 'justify-center px-2' : 'gap-3 px-3',
                                         isActive
-                                            ? 'bg-[var(--ui-border)] text-[var(--ui-text)]'
+                                            ? 'bg-gradient-to-r from-cyan-500/15 to-blue-500/10 text-[var(--ui-text)] border border-cyan-500/20'
                                             : 'text-[var(--ui-text-muted)] hover:bg-[var(--ui-surface-hover)] hover:text-[var(--ui-text)]'
                                     )}
                                 >
@@ -99,12 +112,12 @@ const Sidebar = ({ mobile = false }: SidebarProps) => {
                                     )}
 
                                     {isCollapsed && (
-                                        <span className="pointer-events-none absolute left-12 z-50 whitespace-nowrap rounded bg-black px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">
+                                        <span className="pointer-events-none absolute left-12 z-50 whitespace-nowrap rounded bg-black/80 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100 backdrop-blur-sm">
                                             {item.label}
                                         </span>
                                     )}
                                 </button>
-                            </li>
+                            </Wrapper>
                         );
                     })}
                 </ul>
@@ -115,12 +128,6 @@ const Sidebar = ({ mobile = false }: SidebarProps) => {
                     <p className="text-xs text-[var(--ui-text-muted)]">
                         {registeredApps.length} app{registeredApps.length === 1 ? '' : 's'} saved
                     </p>
-                </div>
-            )}
-
-            {isCollapsed && !mobile && (
-                <div className="flex justify-center pt-3">
-                    <Menu size={14} className="text-[var(--ui-text-muted)]" aria-hidden="true" />
                 </div>
             )}
         </aside>

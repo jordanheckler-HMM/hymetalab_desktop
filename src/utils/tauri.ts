@@ -46,6 +46,10 @@ export const getRunningRegisteredApps = async (
     return invoke<RunningRegisteredApp[]>('get_running_registered_apps', { paths });
 };
 
+export const getAppIcon = async (path: string): Promise<string> => {
+    return invoke<string>('get_app_icon', { path });
+};
+
 export interface CciSignal {
     value: number;
     timestamp: string;
